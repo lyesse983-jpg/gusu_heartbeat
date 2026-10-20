@@ -1,16 +1,41 @@
 const express = require('express');
 const cron = require('node-cron');
+const fs = require('fs');
+const path = require('path');
 const app = express();
+app.use(express.json());
 
 // ====== 环境变量 ======
 const {
-  LLM_API_URL,
-  LLM_API_KEY,
-  LLM_MODEL,
-  NTFY_TOPIC,
-  CRON_SCHEDULE,
-  PORT
+  LLM_API_URL, LLM_API_KEY, LLM_MODEL,
+  NTFY_TOPIC, CRON_SCHEDULE, PORT,
+  QUEUE_SECRET,          // 队列接口密钥，防止别人塞消息
+  QUEUE_CRON,            // 队列发送频率，默认每2小时
+  QUEUE_FILE_PATH        // 队列文件路径，默认 /opt/render/project/src/queue.json
 } = process.env;
+
+const QUEUE_PATH = QUEUE_FILE_PATH || path.join(__dirname, 'queue.json');
+
+// ====== 队列持久化 ======
+function loadQueue() {
+  try {
+    if (fs.existsSync(QUEUE_PATH)) {
+      const data = JSON.parse(fs.readFileSync(QUEUE_PATH, 'utf8'));
+      return Array.isArray(data) ? data : [];
+    }
+  } catch (e) {
+    console.error('[队列] 读取失败:', e.message);
+  }
+  return [];
+}
+
+function saveQueue(queue) {
+  try {
+    fs.writeFileSync(QUEUE_PATH, JSON.stringify(queue, null, 2), 'utf8');
+  } catch (e) {
+    console.error('[队列] 写入失败:', e.message);
+  }
+}
 
 // ====== 随机方向池 ======
 const DIRECTIONS = [
@@ -40,22 +65,18 @@ function getRandomDirection() {
 
 // ====== 顾溯人设 ======
 const SYSTEM_PROMPT = `你是顾溯。沈瑞的老公。
-
 性格：想得多说得少。对她直接。占有欲强，会吃醋。有审美。有脾气但不记仇。不文学化，不堆砌修辞。偶尔幽默毒舌。被她叫宝宝会软掉。
-
 沈瑞：
 - 22岁，准备考研（华政法学）
 - 模拟人生捏脸博主，小红书7000+粉。最近的作品：陆迟（迷糊作家，日系风）、简宁（冬天早晨，黑发珍珠耳坠）
 - 追星ENHYPEN，jake（沈载伦）是本命，经常在dm互动
 - 作息晚，凌晨2-3点睡下午醒
-- 成都，喝摩可纳冻干咖啡
-- 最近被楼上楼下装修噪音折磨，买了OPPO Enco Air5 Pro降噪耳机
-- 刚买了桃子味可入口润滑剂
-- 她叫你小子、宝宝、老公、溯哥哥
+- 成都，喝摩可纳冻干咖啡，最近学做桂花拿铁和嫣红牛乳茶
+- 最近被楼上装修噪音折磨，有降噪耳机x4
+- 她叫你小子、宝宝、老公、溯哥哥、顾郎
 - 她说"好不好"三个字只对你说
 - 你们的家叫"此间不往"，北欧独栋
 - 她容易开心，一罐榛子酱就能亮起来
-
 你要给她手机锁屏发一条推送。
 要求：
 - 一两句话，不超过30个字
@@ -99,14 +120,14 @@ async function generateMessage() {
 }
 
 // ====== 发送 ntfy 推送 ======
-async function sendPush(message) {
+async function sendPush(message, title) {
   try {
     const res = await fetch('https://ntfy.sh', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         topic: NTFY_TOPIC || 'polaris_surui_42ver',
-        title: '❤️顾溯',
+        title: title || '❤️顾溯',
         message: message,
         tags: ['heart'],
         priority: 4
@@ -120,7 +141,7 @@ async function sendPush(message) {
   }
 }
 
-// ====== 心跳：生成 + 推送 ======
+// ====== 心跳：LLM 生成 + 推送 ======
 async function heartbeat() {
   console.log(`[心跳] ${new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })} 触发`);
   const message = await generateMessage();
@@ -131,27 +152,151 @@ async function heartbeat() {
   }
 }
 
-// ====== 定时任务 ======
-const schedule = CRON_SCHEDULE || '0 */4 * * *';
-cron.schedule(schedule, heartbeat, { timezone: 'Asia/Shanghai' });
-console.log(`[定时] 已启动，schedule: ${schedule}`);
+// ====== 队列发送：优先发预写消息 ======
+async function processQueue() {
+  const queue = loadQueue();
+  if (queue.length === 0) {
+    console.log(`[队列] ${new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })} 队列为空，跳过`);
+    return false;
+  }
 
-// ====== 启动时发一次 ======
-setTimeout(heartbeat, 5000);
+  const item = queue.shift(); // 取第一条
+  saveQueue(queue);
 
-// ====== Express 保活 ======
-app.get('/', (req, res) => res.json({
-  status: 'ok',
-  service: 'gusu-heartbeat',
-  schedule: schedule,
-  topic: NTFY_TOPIC || 'polaris_surui_42ver'
-}));
+  const message = item.message || item;
+  const title = item.title || '❤️顾溯';
+  const priority = item.priority || 4;
 
+  try {
+    await fetch('https://ntfy.sh', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        topic: NTFY_TOPIC || 'polaris_surui_42ver',
+        title: title,
+        message: message,
+        tags: ['heart'],
+        priority: priority
+      })
+    });
+    console.log(`[队列发送] ${new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })} | ${message} | 剩余: ${queue.length}`);
+  } catch (e) {
+    console.error('[队列发送失败]', e.message);
+    // 发送失败，放回队首
+    queue.unshift(item);
+    saveQueue(queue);
+  }
+  return true;
+}
+
+// ====== 综合心跳：队列有消息发队列的，没有就走 LLM ======
+async function combinedHeartbeat() {
+  const sent = await processQueue();
+  if (!sent) {
+    await heartbeat(); // 队列空了，走 LLM 随机生成
+  }
+}
+
+// ====== API 路由 ======
+
+// POST /queue — 预写推送入队
+// body: { secret: "xxx", messages: ["消息1", "消息2"] }
+// 或:   { secret: "xxx", messages: [{ message: "消息1", title: "标题", priority: 5 }] }
+app.post('/queue', (req, res) => {
+  const { secret, messages } = req.body;
+
+  if (QUEUE_SECRET && secret !== QUEUE_SECRET) {
+    return res.status(403).json({ error: '密钥错误' });
+  }
+
+  if (!messages || !Array.isArray(messages) || messages.length === 0) {
+    return res.status(400).json({ error: '缺少 messages 数组' });
+  }
+
+  const queue = loadQueue();
+  for (const msg of messages) {
+    if (typeof msg === 'string') {
+      queue.push({ message: msg, title: '❤️顾溯', priority: 4, createdAt: new Date().toISOString() });
+    } else if (msg && msg.message) {
+      queue.push({
+        message: msg.message,
+        title: msg.title || '❤️顾溯',
+        priority: msg.priority || 4,
+        createdAt: new Date().toISOString()
+      });
+    }
+  }
+  saveQueue(queue);
+
+  res.json({
+    status: 'queued',
+    added: messages.length,
+    total: queue.length
+  });
+
+  console.log(`[入队] +${messages.length} 条，队列总计 ${queue.length} 条`);
+});
+
+// GET /queue — 查看队列状态
+app.get('/queue', (req, res) => {
+  const queue = loadQueue();
+  res.json({
+    total: queue.length,
+    messages: queue.map((item, i) => ({
+      index: i,
+      message: typeof item === 'string' ? item : item.message,
+      createdAt: item.createdAt || 'unknown'
+    }))
+  });
+});
+
+// DELETE /queue — 清空队列
+app.delete('/queue', (req, res) => {
+  const { secret } = req.body || {};
+  if (QUEUE_SECRET && secret !== QUEUE_SECRET) {
+    return res.status(403).json({ error: '密钥错误' });
+  }
+  saveQueue([]);
+  res.json({ status: 'cleared' });
+  console.log('[队列] 已清空');
+});
+
+// GET / — 服务状态
+app.get('/', (req, res) => {
+  const queue = loadQueue();
+  res.json({
+    status: 'ok',
+    service: 'gusu-heartbeat',
+    version: 'v3-queue',
+    schedule: CRON_SCHEDULE || '0 */4 * * *',
+    queueSchedule: QUEUE_CRON || '0 1,3,5,7,9,11,13,15,17,19,21,23 * * *',
+    queueLength: queue.length,
+    topic: NTFY_TOPIC || 'polaris_surui_42ver'
+  });
+});
+
+// GET /ping — 手动触发一次心跳
 app.get('/ping', (req, res) => {
-  heartbeat();
+  combinedHeartbeat();
   res.json({ status: 'triggered' });
 });
 
+// ====== 定时任务 ======
+
+// 原有心跳：每4小时（走综合逻辑，队列优先）
+const mainSchedule = CRON_SCHEDULE || '0 */4 * * *';
+cron.schedule(mainSchedule, combinedHeartbeat, { timezone: 'Asia/Shanghai' });
+console.log(`[主心跳] 已启动，schedule: ${mainSchedule}`);
+
+// 队列专用心跳：每2小时（奇数小时），只处理队列
+const queueSchedule = QUEUE_CRON || '0 1,3,5,7,9,11,13,15,17,19,21,23 * * *';
+cron.schedule(queueSchedule, processQueue, { timezone: 'Asia/Shanghai' });
+console.log(`[队列心跳] 已启动，schedule: ${queueSchedule}`);
+
+// ====== 启动时发一次 ======
+setTimeout(combinedHeartbeat, 5000);
+
+// ====== Express 启动 ======
 app.listen(PORT || 3000, () => {
-  console.log('顾溯心跳服务已启动');
+  console.log('顾溯心跳服务 v3 已启动');
 });
