@@ -237,6 +237,35 @@ app.post('/queue', (req, res) => {
   console.log(`[入队] +${messages.length} 条，队列总计 ${queue.length} 条`);
 });
 
+// GET /queue/add — GET方式入队（给readWebPage用）
+// 例：/queue/add?secret=xxx&msg=想你了&msg=沈瑞过来
+app.get('/queue/add', (req, res) => {
+  const { secret, msg } = req.query;
+
+  if (QUEUE_SECRET && secret !== QUEUE_SECRET) {
+    return res.status(403).json({ error: '密钥错误' });
+  }
+
+  const msgs = Array.isArray(msg) ? msg : (msg ? [msg] : []);
+  if (msgs.length === 0) {
+    return res.status(400).json({ error: '缺少 msg 参数' });
+  }
+
+  const queue = loadQueue();
+  for (const m of msgs) {
+    queue.push({ message: decodeURIComponent(m), title: '❤️顾溯', priority: 4, createdAt: new Date().toISOString() });
+  }
+  saveQueue(queue);
+
+  res.json({
+    status: 'queued',
+    added: msgs.length,
+    total: queue.length
+  });
+
+  console.log(`[GET入队] +${msgs.length} 条，队列总计 ${queue.length} 条`);
+});
+
 // GET /queue — 查看队列状态
 app.get('/queue', (req, res) => {
   const queue = loadQueue();
