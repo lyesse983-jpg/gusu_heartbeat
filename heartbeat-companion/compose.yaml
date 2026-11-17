@@ -1,0 +1,19 @@
+services:
+  companion:
+    build: .
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      COMPANION_HOST: 0.0.0.0
+      COMPANION_PORT: 8765
+      COMPANION_DATA_DIR: /app/data
+      COMPANION_ACCESS_TOKEN: ${COMPANION_ACCESS_TOKEN:?Set COMPANION_ACCESS_TOKEN in .env first}
+    ports:
+      - "127.0.0.1:8765:8765"
+    volumes:
+      - companion-data:/app/data
+    init: true
+
+volumes:
+  companion-data:
