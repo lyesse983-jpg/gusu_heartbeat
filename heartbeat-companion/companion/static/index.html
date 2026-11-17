@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f5f2ed">
+  <title>心跳 · Heartbeat Companion</title>
+  <link rel="stylesheet" href="/static/styles.css">
+  <script defer src="/static/app.js"></script>
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <a class="brand" href="#chat" aria-label="心跳首页"><span class="brand-mark" aria-hidden="true">♥</span><span>心跳<small>HEARTBEAT COMPANION</small></span></a>
+      <p class="sidebar-caption">让念头，有下一次。</p>
+      <nav class="navigation" aria-label="主导航">
+        <button class="nav-button active" data-tab="chat" aria-current="page"><span aria-hidden="true">◌</span>聊天</button>
+        <button class="nav-button" data-tab="activity"><span aria-hidden="true">⌁</span>心跳记录</button>
+        <button class="nav-button" data-tab="album"><span aria-hidden="true">▧</span>相册</button>
+        <button class="nav-button" data-tab="memory"><span aria-hidden="true">◇</span>记忆与计划</button>
+        <button class="nav-button" data-tab="settings"><span aria-hidden="true">⚙</span>设置</button>
+      </nav>
+      <div class="sidebar-bottom"><span class="status-dot" id="connection-dot"></span><span id="connection-status">正在连接</span><small>私人的小小工作台</small></div>
+    </aside>
+
+    <main>
+      <header class="page-header">
+        <div><p class="eyebrow" id="date-label">A LITTLE ROOM FOR INITIATIVE</p><h1 id="page-title">聊天</h1></div>
+        <div class="header-badges"><span class="mode-badge" id="mode-badge">正在连接</span><span class="version-badge">本地版 01</span></div>
+      </header>
+      <div id="error-banner" class="notice error" role="alert" hidden></div>
+      <div id="success-banner" class="notice success" role="status" hidden></div>
+
+      <section class="tab-panel" id="panel-chat" aria-label="聊天">
+        <div class="chat-layout">
+          <div class="chat-card card">
+            <div class="card-topline"><span><i class="small-heart" aria-hidden="true">♥</i> 从这里，接着聊</span><span id="chat-status" class="muted">等待新的话题</span></div>
+            <div id="messages" class="messages" role="log" aria-label="聊天消息" aria-live="polite"></div>
+            <form id="chat-form" class="composer">
+              <label class="sr-only" for="chat-input">给小机发消息</label>
+              <textarea id="chat-input" name="content" rows="2" placeholder="有件事想跟你说……" maxlength="12000" required></textarea>
+              <div class="composer-footer"><span>Enter 发送 · Shift + Enter 换行</span><button class="primary-button" id="send-button" type="submit">发送 <span aria-hidden="true">↗</span></button></div>
+            </form>
+          </div>
+          <aside class="context-column">
+            <div class="wake-card card">
+              <div class="orb-scene" aria-hidden="true"><div class="orb-ring"></div><div class="orb"></div><span class="orb-spark one">✧</span><span class="orb-spark two">·</span></div>
+              <p class="eyebrow">THE NEXT LITTLE MOMENT</p><h2 id="wake-heading">等一个新的念头</h2><p id="wake-purpose" class="muted">连接后显示下一次唤醒计划。</p>
+              <div class="wake-time"><span>下次醒来</span><strong id="wake-time">—</strong></div>
+              <button type="button" class="secondary-button full-width" id="wake-button">现在唤醒一次 <span aria-hidden="true">↗</span></button>
+              <p class="fine-print">醒来可以安静做事，也可以发消息。唤醒时间不等于通知时间。</p>
+            </div>
+            <div class="card outcome-card"><div class="section-title"><h2>留下来的东西</h2><span id="artifact-count" class="count-badge">0</span></div><div id="artifacts"></div></div>
+            <p class="side-note">第一版的消息会留在这里。<br>暂不发送手机推送。</p>
+          </aside>
+        </div>
+      </section>
+
+      <section class="tab-panel" id="panel-activity" aria-label="心跳记录" hidden>
+        <div class="intro-row"><div><h2>没聊天的时候，也有迹可循。</h2><p>这里记录实际执行的工具操作与运行结果，不展示或编造内心独白。</p></div><span class="pill" id="usage-pill">今日运行 —</span></div>
+        <div class="card timeline-card" id="activities"></div>
+      </section>
+
+      <section class="tab-panel" id="panel-album" aria-label="相册" hidden>
+        <div class="intro-row"><div><h2>一些可以被再次翻到的瞬间。</h2><p>上传到这里的照片，才会进入小机可以读取的相册。配文能帮助它找回那一刻。</p></div><button class="secondary-button" id="show-photo-form" type="button">＋ 放一张照片</button></div>
+        <form id="photo-form" class="card entry-form" hidden>
+          <div class="field"><label for="photo-file">选择照片</label><input type="file" id="photo-file" name="file" accept="image/jpeg,image/png,image/webp,image/gif" required></div>
+          <div class="field"><label for="photo-title">名字</label><input id="photo-title" name="title" maxlength="160" placeholder="给这张照片起个名字" required></div>
+          <div class="field wide"><label for="photo-caption">想记住什么</label><textarea id="photo-caption" name="caption" rows="2" maxlength="2000" placeholder="时间、地点，或关于这张照片的一点小事"></textarea></div>
+          <div class="form-actions wide"><span class="fine-print">照片保存在运行此程序的设备上；模型读取时会发送至你配置的 API。</span><button class="primary-button" type="submit">保存照片</button></div>
+        </form>
+        <div id="photos" class="photo-grid"></div>
+      </section>
+
+      <section class="tab-panel" id="panel-memory" aria-label="记忆与计划" hidden>
+        <div class="intro-row"><div><h2>记住的事，和还想继续的事。</h2><p>你可以补充或删除；填写相同记忆主题可以更新内容。小机的后台行动也会把实际进度保存在这里。</p></div></div>
+        <div class="memory-layout">
+          <div><div class="section-title"><h2>记忆</h2><span id="memory-count" class="count-badge">0</span></div><form id="memory-form" class="card compact-form"><label class="sr-only" for="memory-key">记忆主题</label><input id="memory-key" name="key" placeholder="主题，例如：聊天偏好" maxlength="100" required><label class="sr-only" for="memory-content">记忆内容</label><textarea id="memory-content" name="content" rows="3" placeholder="想让小机记住什么？" maxlength="3000" required></textarea><button class="secondary-button" type="submit">＋ 记下来</button></form><div id="memories" class="stack-list"></div></div>
+          <div><div class="section-title"><h2>手头计划</h2><span id="plan-count" class="count-badge">0</span></div><form id="plan-form" class="card compact-form"><label class="sr-only" for="plan-title">计划名称</label><input id="plan-title" name="title" placeholder="想一起慢慢完成的事" maxlength="160" required><label class="sr-only" for="plan-detail">计划内容</label><textarea id="plan-detail" name="detail" rows="3" placeholder="现在做到哪里，下次从哪里继续？" maxlength="4000" required></textarea><button class="secondary-button" type="submit">＋ 留个计划</button></form><div id="plans" class="stack-list"></div></div>
+        </div>
+      </section>
+
+      <section class="tab-panel" id="panel-settings" aria-label="设置" hidden>
+        <div class="intro-row"><div><h2>给主动，留一个舒服的节奏。</h2><p>这些设置控制后台运行和消息发送。时区：<span id="timezone-label">Asia/Shanghai</span>。</p></div></div>
+        <form id="settings-form" class="card settings-card">
+          <div class="settings-row"><div><label for="enabled">自动心跳</label><p>允许已预约的后台唤醒运行。关闭后仍可聊天。</p></div><label class="switch"><input type="checkbox" id="enabled" name="enabled"><span></span></label></div>
+          <div class="settings-row"><div><label for="quiet-start">安静时段</label><p>期间自动唤醒只在后台做事，不主动发消息。手动唤醒不受此限制。</p></div><div class="time-inputs"><input type="time" id="quiet-start" name="quiet_start" required><span>至</span><input type="time" id="quiet-end" name="quiet_end" required></div></div>
+          <div class="settings-row"><div><label for="daily-budget">每日模型调用上限</label><p>包含聊天和后台活动；一次运行可能调用模型多次。</p></div><input type="number" id="daily-budget" name="daily_budget" min="1" max="200" required></div>
+          <div class="form-actions"><span class="fine-print">修改后点击保存。</span><button class="primary-button" type="submit">保存设置</button></div>
+        </form>
+        <form id="persona-form" class="card settings-card"><div class="section-title"><h2>称呼与交流风格</h2><span class="pill">会带进每次聊天和唤醒</span></div><label class="sr-only" for="persona-content">小机的称呼和交流风格</label><textarea id="persona-content" name="content" rows="6" maxlength="12000" placeholder="你希望怎么称呼彼此，喜欢怎样聊天？也可以写下希望它主动留意的事。"></textarea><div class="form-actions"><span class="fine-print">保存在这台设备的数据中，不写进源代码。</span><button class="primary-button" type="submit">保存交流风格</button></div></form>
+        <div class="card settings-card"><div class="section-title"><h2>模型连接</h2><span class="pill" id="provider-label">—</span></div><p class="muted">真实模型的 API 密钥在服务端环境变量中配置，不在网页里输入或保存。配置后重启程序即可切换；具体变量见项目 README 和 .env.example。</p><div class="code-note">当前模型：<strong id="model-label">—</strong></div><p class="fine-print" id="demo-explanation">演示模式使用固定流程验证界面和调度，不代表模型自主决策。</p></div>
+        <form id="token-form" class="card settings-card"><div class="section-title"><h2>访问口令</h2><span class="pill">可选</span></div><p class="muted">如果服务端配置了访问令牌，在这里填入。只保存在当前浏览器标签页的会话中。</p><div class="token-controls"><label class="sr-only" for="access-token">访问令牌</label><input type="password" id="access-token" autocomplete="off" placeholder="服务端访问令牌"><button class="secondary-button" type="submit">应用口令</button><button class="text-button" type="button" id="clear-token">清除</button></div></form>
+      </section>
+      <footer class="page-footer"><span class="footer-heart" aria-hidden="true">♥</span> 一次心跳，一点延续。<span id="last-updated"></span></footer>
+    </main>
+  </div>
+  <dialog id="artifact-dialog"><div class="dialog-header"><h2 id="artifact-title"></h2><button type="button" id="close-artifact" class="icon-button" aria-label="关闭">×</button></div><pre id="artifact-content"></pre><button type="button" class="secondary-button" id="download-artifact">下载文本</button></dialog>
+</body>
+</html>

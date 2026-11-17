@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "heartbeat-companion"
+version = "0.1.0"
+description = "A small, persistent, self-scheduling companion runtime with a Chinese dashboard"
+requires-python = ">=3.12"
+dynamic = ["dependencies"]
+
+[project.scripts]
+heartbeat-companion = "companion.__main__:main"
+
+[tool.setuptools.packages.find]
+include = ["companion*"]
+
+[tool.setuptools.package-data]
+companion = ["static/*.html", "static/*.js", "static/*.css"]
+
+[tool.setuptools.dynamic]
+dependencies = {file = ["requirements.txt"]}

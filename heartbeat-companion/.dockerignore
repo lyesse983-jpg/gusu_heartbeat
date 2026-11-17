@@ -1,0 +1,17 @@
+.git
+.venv
+venv
+.env
+.env.*
+!.env.example
+data
+photos
+upload
+uploads
+__pycache__
+*.pyc
+*.sqlite*
+*.db
+*.zip
+*.tar*
+.DS_Store
